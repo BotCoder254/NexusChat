@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col md:flex-row h-screen bg-gray-100">
+    <!-- Sidebar -->
+    <div class="w-full md:w-1/4 lg:w-1/5 bg-white border-r border-gray-200 overflow-y-auto">
+        <!-- User Profile -->
+        <div id="user-profile" class="p-4 border-b border-gray-200">
+            <div class="flex items-center mb-4">
+                <img src="{{ url_for('static', filename='uploads/profile_pics/' + session.username + '.png') }}" alt="Profile" class="w-12 h-12 rounded-full mr-4">
+                <div>
+                    <h2 class="font-bold">{{ session.username }}</h2>
+                    <p class="text-sm text-gray-600">@{{ session.username.lower() }}</p>
+                </div>
+            </div>
+            <button onclick="showProfileModal()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full">
+                Edit Profile
+            </button>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="mt-4">
+            <a href="#" class="block px-4 py-2 hover:bg-gray-100">
+                <i class="fas fa-home mr-2"></i> Home
+            </a>
+            <a href="#" class="block px-4 py-2 hover:bg-gray-100">
+                <i class="fas fa-bell mr-2"></i> Notifications
+            </a>
+            <a href="#" class="block px-4 py-2 hover:bg-gray-100">
+                <i class="fas fa-envelope mr-2"></i> Messages
+            </a>
+        </nav>
+
+        <!-- Groups -->
+        <div class="p-4">
+            <h3 class="font-bold mb-4">Groups</h3>
+            <ul id="group-list" class="space-y-2">
+                {% for group in groups %}
+                <li>
+                    <button onclick="joinGroup('{{ group._id }}')" class="w-full text-left p-2 hover:bg-gray-100 rounded-full flex justify-between items-center">
+                        <span>{{ group.name }}</span>
+                        <span class="text-xs text-gray-500">{{ group.members|length }} members</span>
+                    </button>
+                    {% if group.is_private and group.creator == session.username %}
+                        <span class="text-xs text-blue-500 cursor-pointer ml-2" data-tooltip="Click to copy invite link" onclick="copyInviteLink('{{ group.invite_link }}')">
+                            <i class="fas fa-link"></i> Invite Link
+                        </span>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            <button onclick="showCreateGroupModal()" class="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full">
+                <i class="fas fa-plus mr-2"></i> Create Group
+            </button>
+        </div>
+
+        <button onclick="showJoinPrivateGroupModal()" class="mt-2 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full">
+            <i class="fas fa-user-plus mr-2"></i> Join Private Group
+        </button>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="flex-1 flex flex-col">
+        <div id="chat-header" class="bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+            <h2 id="current-group-name" class="font-bold text-xl">Select a group</h2>
+            <button id="show-members-btn" onclick="showGroupMembers()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full hidden">
+                <i class="fas fa-users mr-2"></i> Members
+            </button>
+        </div>
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+        <div class="bg-white border-t border-gray-200 p-4">
+            <form id="message-form" class="flex items-center">
+                <input type="text" id="message-input" class="flex-grow mr-2 p-2 border rounded-full" placeholder="Type your message...">
+                <label for="file-input" class="cursor-pointer mr-2">
+                    <i class="fas fa-paperclip text-gray-500 hover:text-gray-700"></i>
+                    <input type="file" id="file-input" class="hidden" accept="image/*,video/*,audio/*">
+                </label>
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Create Group Modal -->
+<div id="create-group-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
+    <div class="bg-white p-8 rounded-lg max-w-md w-full">
+        <h2 class="text-2xl font-bold mb-4">Create New Group</h2>
+        <form id="create-group-form">
+            <div class="mb-4">
+                <label for="group-name" class="block text-gray-700 text-sm font-bold mb-2">Group Name</label>
+                <input type="text" id="group-name" name="group_name" class="w-full px-3 py-2 border rounded-lg" required>
+            </div>
+            <div class="mb-4">
+                <label class="flex items-center">
+                    <input type="checkbox" id="is-private" name="is_private" class="mr-2">
+                    <span class="text-sm">Private Group</span>
+                </label>
+            </div>
+            <div class="flex justify-end">
+                <button type="button" onclick="hideCreateGroupModal()" class="mr-2 px-4 py-2 text-gray-600 bg-gray-200 rounded-full">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-full">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Profile Modal -->
+<div id="profile-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
+    <div class="bg-white p-8 rounded-lg max-w-md w-full">
+        <h2 class="text-2xl font-bold mb-4">Edit Profile</h2>
+        <form id="profile-form" enctype="multipart/form-data">
+            <div class="mb-4">
+                <label for="profile-image-input" class="block text-gray-700 text-sm font-bold mb-2">Profile Image</label>
+                <input type="file" id="profile-image-input" name="profile_image" accept="image/*" class="w-full">
+                <img id="profile-image-preview" src="{{ url_for('static', filename='uploads/profile_pics/' + session.username + '.png') }}" alt="Profile Preview" class="mt-2 w-32 h-32 object-cover rounded-full">
+            </div>
+            <div class="mb-4">
+                <label for="bio-input" class="block text-gray-700 text-sm font-bold mb-2">Bio</label>
+                <textarea id="bio-input" name="bio" class="w-full px-3 py-2 border rounded-lg" rows="3"></textarea>
+            </div>
+            <div class="flex justify-end">
+                <button type="button" onclick="hideProfileModal()" class="mr-2 px-4 py-2 text-gray-600 bg-gray-200 rounded-full">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-full">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Join Private Group Modal -->
+<div id="join-private-group-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
+    <div class="bg-white p-8 rounded-lg max-w-md w-full">
+        <h2 class="text-2xl font-bold mb-4">Join Private Group</h2>
+        <form id="join-private-group-form">
+            <div class="mb-4">
+                <label for="invite-link-input" class="block text-gray-700 text-sm font-bold mb-2">Invite Link</label>
+                <input type="text" id="invite-link-input" name="invite_link" class="w-full px-3 py-2 border rounded-lg" required>
+            </div>
+            <div class="flex justify-end">
+                <button type="button" onclick="hideJoinPrivateGroupModal()" class="mr-2 px-4 py-2 text-gray-600 bg-gray-200 rounded-full">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-full">Join</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Group Members Modal -->
+<div id="group-members-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
+    <div class="bg-white p-8 rounded-lg max-w-md w-full">
+        <h2 class="text-2xl font-bold mb-4">Group Members</h2>
+        <ul id="group-members-list" class="space-y-2 max-h-64 overflow-y-auto"></ul>
+        <div class="mt-4 flex justify-end">
+            <button onclick="hideGroupMembersModal()" class="px-4 py-2 bg-blue-500 text-white rounded-full">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}
